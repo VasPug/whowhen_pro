@@ -1,0 +1,9 @@
+# Frozen-model, text-only pilot. All other bounded defaults are in config.py.
+# Change settings BEFORE prepare/run; changes produce a separate run identity.
+model: qwen/qwen3.5-122b-a10b
+provider: alibaba
+sample_size: 24
+dev_size: 6
+repetitions: 1
+seed: 20261115
+max_cost_usd: 25.0
