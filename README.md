@@ -37,6 +37,20 @@ Given a failed agent trajectory, a model is evaluated on four axes:
 
 ## 🚀 Quickstart
 
+### Frozen-model harness experiment
+
+Compare the existing baseline with AgentRx-inspired evidence gathering and
+RAFFLES-inspired review using the same Qwen3.5 model and inputs:
+
+```bash
+bash scripts/run-judge-experiment.sh
+```
+
+The launcher prompts privately for an OpenRouter API key. It prepares a pinned,
+24-trace text pilot with bounded spending and resumable results. For a no-key
+synthetic check, add `--offline`. See the [experiment quickstart](docs/judge-harness-quickstart.md)
+for controls, limitations, metrics, and configuration.
+
 ### Install
 
 ```bash

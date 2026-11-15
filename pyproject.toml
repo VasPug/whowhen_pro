@@ -27,6 +27,10 @@ dependencies = [
 [project.scripts]
 whowhen-eval = "whowhen_eval.run:main"
 whowhen-leaderboard = "whowhen_eval.leaderboard:main"
+whowhen-experiment = "whowhen_eval.experiment.__main__:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 include = ["whowhen_eval*"]

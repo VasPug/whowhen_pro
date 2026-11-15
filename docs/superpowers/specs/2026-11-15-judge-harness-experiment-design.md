@@ -2,6 +2,8 @@
 
 Status: research specification draft; no experiment has been run. The three-condition comparison and focus on error classification come from the user. Settings explicitly marked **proposed** are drafting choices, not decisions already approved by the user.
 
+Implementation addendum (2026-11-15): the user subsequently authorized planning and unattended implementation through API-key-ready operation. The [implementation plan](../plans/2026-11-15-judge-harness.md) resolves execution settings as editable defaults: a 24-case short-text pilot, six separate development groups, one repetition, OpenRouter Qwen3.5-122B-A10B on Alibaba only, reasoning disabled, two review cycles, and a $25 conservative reservation ceiling. The pinned release contains 17 modes and its text labels fit that vocabulary. This implementation targets that release and uses baseline-visible inputs throughout. The initial programmatic checker supports grounded numeric comparisons; other checks use Qwen. No live results or full-paper reproduction are claimed. The original open-decision sections below preserve the design context; the plan and quickstart state the implemented choices.
+
 ## Purpose and scope
 
 Measure how the judge harness changes failure-attribution performance when the underlying Qwen3.5 model is held fixed. The primary outcome is **What: error-mode macro-F1**. Improvement, regression, and no detectable difference are all valid outcomes. Also measure Who, When, All, and resource use.
