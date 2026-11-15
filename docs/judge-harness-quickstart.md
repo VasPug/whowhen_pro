@@ -8,7 +8,7 @@ bash scripts/run-judge-experiment.sh
 
 The launcher asks for your **OpenRouter API key** without displaying or saving it. If `OPENROUTER_API_KEY` is already exported, it uses that variable. Noninteractive execution requires the variable. Do not paste a key into this chat or commit it. The account needs access/credit for the configured model.
 
-The launcher sets up a local virtual environment if needed, downloads/checks the pinned public text dataset (about 76 MB), prepares the fixed cohort, runs all three conditions, and prints the report path. The provided workspace is already prepared. No paid call was made during development. Authentication and real Qwen response compatibility still require the first live run.
+The launcher sets up a local virtual environment if needed, downloads/checks the pinned public text dataset (about 76 MB), prepares the fixed cohort, validates the key through OpenRouter's nonbillable key endpoint, runs all three conditions, and prints the report path. The provided workspace is already prepared. No paid call was made during development. Authentication and real Qwen response compatibility still require the first live run.
 
 ## Defaults
 
@@ -52,10 +52,12 @@ Within `live/` or `offline/`:
 - `report.json`: per-repetition metrics, confusion matrices, resource usage, completion rates and successful-record-only scores for comparison.
 - `per-mode.csv`: precision, recall, F1 and support per error category/repetition.
 - `results/`: final per-condition/per-case records, including failures and harness evidence/reviews.
-- `calls/`: prompts, responses, usage and errors for every completed call attempt. These contain benchmark content, never the API key. Interrupted calls can have unknown usage; their reservations persist.
+- `calls/`: durable attempt-start records and matching completion/error records with prompts, responses and usage. These contain benchmark content, never the API key. Starts without completions are reported as unknown-outcome attempts; their reservations persist.
 - `budget.json`: spending reservations, retained across restarts.
 
 Run the same command to resume. Completed records, including recorded failures, are not automatically rerun; this prevents silently selecting better attempts or spending indefinitely. An interrupted in-progress case may be run again, with all previous reservations retained. Offline results cannot satisfy a live run. One process may hold the experiment lock at a time.
+
+Invalid credentials, insufficient account credit, and global routing/configuration errors stop the run without caching the affected case as a failure. Correct the key/account issue and rerun the same command. Already completed cases remain intact; unscheduled cases remain visibly missing until resumed.
 
 Exit code 0 means every scheduled result completed without harness/transport failures; 3 means recorded failures remain; 2 means the report is incomplete; 1 indicates setup/configuration trouble. A parseable but partly missing attribution is recorded with parser warnings and scored per available field, just as upstream does. Missing final outputs or failed stages count wrong on all axes. Review disagreement at the cap can still produce a valid final result.
 

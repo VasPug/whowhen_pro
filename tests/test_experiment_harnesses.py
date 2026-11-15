@@ -97,3 +97,17 @@ def test_structural_validation_is_not_correctness(release, taxonomy):
     c = bundle(release, taxonomy)
     assert valid_prediction({'agent_name': 'agent', 'step_coord': 'Step 1', 'error_mode': 'A.1'}, c, taxonomy)
     assert not valid_prediction({'agent_name': 'nonexistent', 'step_coord': '1', 'error_mode': 'A.1'}, c, taxonomy)
+
+
+@pytest.mark.parametrize('source,quote,value', [
+    ('Price 620 pounds', '20 pounds', 20),
+    ('Balance -5 pounds', '5 pounds', 5),
+    ('Amount 1e3 pounds', '3 pounds', 3),
+    ('Budget 1,500 pounds', '500 pounds', 500),
+    ('Temperature −5 degrees', '5 degrees', 5),
+    ('Balance x-5 pounds', '5 pounds', 5),
+])
+def test_numeric_quote_cannot_cut_a_larger_source_number(source, quote, value):
+    from whowhen_eval.experiment.checks import numeric_operand
+    with pytest.raises(InvalidOutput):
+        numeric_operand({'ref': 'event:0', 'quote': quote, 'value': value}, {'event:0': source})

@@ -11,7 +11,7 @@ from ..score import score
 from .config import ARMS
 from .data import digest, file_hash, code_hash, atomic_json
 from .checks import InvalidOutput
-from .client import Client, ProviderError, BudgetExceeded
+from .client import Client, ProviderError, FatalProviderError, BudgetExceeded, validate_credentials
 from .harnesses import run_harness
 
 
@@ -19,6 +19,17 @@ def verify(run_dir):
     root = Path(run_dir)
     m = json.loads((root/'manifest.json').read_text())
     if digest(m['identity']) != m['run_id']: raise ValueError('Manifest identity changed')
+    payload = {k:v for k,v in m.items() if k not in ('identity','run_id')}
+    if digest(payload) != m['identity'].get('prepared_hash'): raise ValueError('Manifest cohort/artifact fingerprints changed')
+    cfg = m['identity']['config']
+    if len(m['evaluation']) != cfg['sample_size'] or len(m['development']) != cfg['dev_size']:
+        raise ValueError('Manifest partition counts differ from configuration')
+    entries = m['evaluation'] + m['development']
+    ids = [e['case_id'] for e in entries]
+    groups = [e['group'] for e in entries]
+    if len(set(ids)) != len(ids) or len(set(groups)) != len(groups):
+        raise ValueError('Manifest cases/groups must be unique and partitions disjoint')
+    if set(ids) != set(m['case_hashes']): raise ValueError('Manifest case references differ')
     if m['identity']['code_hash'] != code_hash(): raise ValueError('Code changed; prepare a new run')
     if file_hash(root/'taxonomy.yaml') != m['identity']['files']['taxonomy']:
         raise ValueError('Prepared taxonomy changed')
@@ -53,6 +64,7 @@ def run(run_dir, offline=False, client_factory=Client):
         schedule = [(arm, entry, rep) for rep in range(cfg['repetitions'])
                     for entry in m['evaluation'] for arm in ARMS]
         random.Random(cfg['seed']).shuffle(schedule)
+        if not offline: validate_credentials(cfg)
         for index, (arm, entry, rep) in enumerate(schedule, 1):
             name = result_name(arm, entry['case_id'], rep)
             dest = mode/'results'/f'{name}.json'
@@ -76,6 +88,12 @@ def run(run_dir, offline=False, client_factory=Client):
                 record['valid_fields'] = all(output['prediction'].get(k) for k in ('agent_name','step_coord','error_mode'))
             except BudgetExceeded:
                 record['error'] = 'budget_exhausted'
+            except FatalProviderError:
+                # Bad key/account/routing affects the run, not this trace. Leave
+                # the outcome missing so corrected setup can resume normally.
+                from .report import summarize
+                summarize(root, offline=offline)
+                raise
             except (ProviderError, InvalidOutput) as e:
                 record['error'] = str(e)  # these classes use fixed, credential-free diagnostics
             except Exception as e:

@@ -36,9 +36,18 @@ def numeric_operand(value, sources):
     if isinstance(n, bool) or not isinstance(n, (int, float)) or not math.isfinite(n):
         raise InvalidOutput('Numeric operand must be finite')
     # Only simple unambiguous numeric spans; complex formats go to semantic checking.
-    numbers = re.findall(r'(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])', value['quote'])
-    if len(numbers) != 1 or float(numbers[0]) != n:
+    numbers = list(re.finditer(r'(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])', value['quote']))
+    if len(numbers) != 1 or float(numbers[0].group()) != n:
         raise InvalidOutput('Numeric operand does not match its cited span')
+    source = sources[value['ref']]
+    # Match broad numeric tokens in the ORIGINAL source. Grouped/scientific numbers
+    # must not become different values by trimming the quote around a suffix.
+    tokens = {m.span() for m in re.finditer(
+        r'(?<![\w.+−-])[+−-]?(?:\d+(?:,\d+)*(?:\.\d+)?|\.\d+)(?:[eE][+−-]?\d+)?(?![\w]|[.,]\d)', source)}
+    for occurrence in re.finditer(re.escape(value['quote']), source):
+        span = (occurrence.start()+numbers[0].start(), occurrence.start()+numbers[0].end())
+        if span not in tokens:
+            raise InvalidOutput('Numeric operand quote cuts a larger source number')
     return n
 
 

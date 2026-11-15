@@ -1,6 +1,6 @@
 # Judge Harness Experiment Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Leave a reproducible three-condition pilot runnable with only an OpenRouter API key.
 
@@ -35,11 +35,11 @@
 
 **Interfaces:** `load_config(path) -> dict`; `prepare(config, data_root, run_root) -> Path`; `bundle(release, taxonomy) -> dict` with original `baseline_parts`, normalized `events`, `task`, `step_format_hint`, and `source_hash`. Prepared directory holds manifest, visible cases, evaluation-only labels, and taxonomy.
 
-- [ ] Write tests for config bounds, exact baseline parity, hidden-label stripping, stable grouping/sampling, source/code/config identity, and corrupt downloads.
-- [ ] Run `python -m pytest tests/test_experiment_data.py -q`; verify failure from missing implementation.
-- [ ] Implement revision-pinned downloads with SHA256 checks and atomic replacement; deterministic normalization over renderer blocks; prepare fixed cohort and disjoint dev groups. Only text supported in initial runner; reject other modalities explicitly.
-- [ ] Run tests and verify pass; audit real pinned data taxonomy coverage.
-- [ ] Commit Task 1 and ledger results.
+- [x] Write tests for config bounds, exact baseline parity, hidden-label stripping, stable grouping/sampling, source/code/config identity, and corrupt downloads.
+- [x] Run `python -m pytest tests/test_experiment_data.py -q`; verify failure from missing implementation.
+- [x] Implement revision-pinned downloads with SHA256 checks and atomic replacement; deterministic normalization over renderer blocks; prepare fixed cohort and disjoint dev groups. Only text supported in initial runner; reject other modalities explicitly.
+- [x] Run tests and verify pass; audit real pinned data taxonomy coverage.
+- [x] Commit Task 1 and ledger results.
 
 ## Task 2: Harness workflows
 
@@ -47,10 +47,10 @@
 
 **Interfaces:** `run_harness(name, case, taxonomy, config, call) -> dict`; injected `call(role, parts) -> str` records usage externally. `check_constraint(constraint, evidence_sources) -> dict` validates references and executes allowlisted comparisons. Results include parsed prediction and intermediate audit.
 
-- [ ] Write tests for one-call baseline parity, prefix-only constraint generation, validated evidence references, numeric extraction anchored to source spans, semantic/inconclusive routing, no arbitrary execution, 10-call review cap, disagreement, malformed revision fallback, and invalid intermediate responses.
-- [ ] Verify tests fail, then implement task-level requirements plus per-step constraints/checks and joint final judgment; implement four-reviewer bounded review loop with structural validation.
-- [ ] Run targeted tests and Task 1 tests; verify pass.
-- [ ] Commit Task 2 and ledger results.
+- [x] Write tests for one-call baseline parity, prefix-only constraint generation, validated evidence references, numeric extraction anchored to source spans, semantic/inconclusive routing, no arbitrary execution, 10-call review cap, disagreement, malformed revision fallback, and invalid intermediate responses.
+- [x] Verify tests fail, then implement task-level requirements plus per-step constraints/checks and joint final judgment; implement four-reviewer bounded review loop with structural validation.
+- [x] Run targeted tests and Task 1 tests; verify pass.
+- [x] Commit Task 2 and ledger results.
 
 ## Task 3: Bounded provider calls
 
@@ -58,10 +58,10 @@
 
 **Interfaces:** `Client(config, audit_path, budget_path, offline=False)` callable as `client(role, parts) -> str`. Inject HTTP transport in tests. Persistent budget reserves conservative input-byte/output-token upper cost before each attempt; budget is shared across resume.
 
-- [ ] Write tests for exact provider routing, missing-key error, key redaction, transient-only retries, persistent reservations, input overflow, missing usage, response model mismatch, and offline labeling.
-- [ ] Verify failure, then implement standard-library OpenRouter requests with no implicit fallback or dropped parameters, explicit backoff and bounded cost. Offline responses exercise workflows but are never represented as model results.
-- [ ] Run targeted tests; verify pass.
-- [ ] Commit Task 3 and ledger results.
+- [x] Write tests for exact provider routing, missing-key error, key redaction, transient-only retries, persistent reservations, input overflow, missing usage, response model mismatch, and offline labeling.
+- [x] Verify failure, then implement standard-library OpenRouter requests with no implicit fallback or dropped parameters, explicit backoff and bounded cost. Offline responses exercise workflows but are never represented as model results.
+- [x] Run targeted tests; verify pass.
+- [x] Commit Task 3 and ledger results.
 
 ## Task 4: Resumable CLI and reports
 
@@ -69,21 +69,25 @@
 
 **Interfaces:** CLI subcommands `prepare`, `run`, `report`, `doctor`; all accept `--config`. `run` supports `--offline` and reuses atomic per-condition/per-repetition result files. `summarize(run_dir) -> dict` produces JSON, Markdown and per-mode CSV.
 
-- [ ] Write tests for complete three-arm offline run, resume without repeat calls, run locking, manifest/input mutation rejection, fixed-denominator failed/unrun cases, no live/offline cache collisions, partial-report warning, paired clustered intervals and correct framework weighting.
-- [ ] Verify failure, then implement deterministic interleaving, shared budget, atomic results, lightweight file lock, complete accounting and reports. Bootstrap 1,000 paired samples for exploratory 95% intervals; report two comparisons without confirmatory significance claims.
-- [ ] Run all experiment tests and upstream tests; verify pass.
-- [ ] Commit Task 4 and ledger results.
+- [x] Write tests for complete three-arm offline run, resume without repeat calls, run locking, manifest/input mutation rejection, fixed-denominator failed/unrun cases, no live/offline cache collisions, partial-report warning, paired clustered intervals and correct framework weighting.
+- [x] Verify failure, then implement deterministic interleaving, shared budget, atomic results, lightweight file lock, complete accounting and reports. Bootstrap 1,000 paired samples for exploratory 95% intervals; report two comparisons without confirmatory significance claims.
+- [x] Run all experiment tests and upstream tests; verify pass.
+- [x] Commit Task 4 and ledger results.
 
 ## Task 5: Ready-to-run delivery
 
 **Files:** Create `scripts/run-judge-experiment.sh`, `docs/judge-harness-quickstart.md`, `.env.example`; update `README.md`, `pyproject.toml`, spec implementation addendum and this plan.
 
-- [ ] Add a launcher test showing an unset key fails clearly before any paid request and the offline mode runs without a key.
-- [ ] Implement launcher: create/use local venv, install package, prepare pinned data, run all three conditions, produce report; prompt silently for key only in an interactive terminal if unset, never write it to disk. CLI entry point `whowhen-experiment`.
-- [ ] Install in the worktree venv; prepare real data; run `doctor`, full offline workflow, and upstream real-data scorer checks. Verify no paid request was made.
-- [ ] Obtain independent whole-branch review, fix material findings with regression tests, rerun suite, freeze exact dependencies for reproduction, commit completed work.
-- [ ] Deliver launcher command, API-key provider, report locations, defaults and verification limitations. Keep feature branch/worktree available; no push or merge requested.
+- [x] Add a launcher test showing an unset key fails clearly before any paid request and the offline mode runs without a key.
+- [x] Implement launcher: create/use local venv, install package, prepare pinned data, run all three conditions, produce report; prompt silently for key only in an interactive terminal if unset, never write it to disk. CLI entry point `whowhen-experiment`.
+- [x] Install in the worktree venv; prepare real data; run `doctor`, full offline workflow, and upstream real-data scorer checks. Verify no paid request was made.
+- [x] Obtain independent whole-branch review, fix material findings with regression tests, rerun suite, freeze exact dependencies for reproduction, commit completed work.
+- [x] Deliver launcher command, API-key provider, report locations, defaults and verification limitations. Keep feature branch/worktree available; no push or merge requested.
 
 ## Execution decisions
 
 The user explicitly requested planning followed by unattended implementation, so no additional plan-approval pause is needed. The unresolved spec settings above are now conservative, editable defaults. These choices limit the initial claim to a text-only pilot; broader modality coverage and equal-compute comparisons remain outside this implementation.
+
+## Independent review corrections
+
+The final review found five material issues, each reproduced with a failing regression before correction: global auth failures caching outcomes; numeric quote fragments; cohort metadata outside the run identity; missing audit starts on interruption; and transient response-payload errors bypassing retries. The implementation now validates credentials without a model call, propagates global failures without recording terminal results, validates numeric boundaries in original source text, binds prepared cohort/artifact fingerprints into run identity, persists attempt starts, and classifies HTTP and payload errors consistently. Unknown-outcome calls remain visible in resource reports.

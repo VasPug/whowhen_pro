@@ -45,6 +45,11 @@ def atomic_json(path, value):
         if os.path.exists(tmp): os.unlink(tmp)
 
 
+def json_file_hash(value):
+    content = json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + '\n'
+    return hashlib.sha256(content.encode()).hexdigest()
+
+
 def download_verified(url, path, expected):
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and file_hash(path) == expected: return
@@ -107,12 +112,6 @@ def prepare(cfg, data_root, run_root):
         expected = cfg[f'{key}_sha256']
         if expected and expected != hashes[key]: raise ValueError(f'{key} checksum mismatch')
     identity = {'config': cfg, 'files': hashes, 'code_hash': code_hash()}
-    run_id = digest(identity)
-    out = run_root / run_id[:16]
-    if (out / 'manifest.json').exists():
-        existing = json.loads((out / 'manifest.json').read_text())
-        if existing['identity'] != identity: raise ValueError('Manifest identity mismatch')
-        return out
     taxonomy = load_taxonomy(data_root)
     candidates, excluded, all_modes = [], [], Counter()
     seen = set()
@@ -152,21 +151,32 @@ def prepare(cfg, data_root, run_root):
     needed = cfg['sample_size'] + cfg['dev_size']
     if len(order) < needed: raise ValueError(f'Only {len(order)} eligible task groups; need {needed}')
     selected = order[:needed]
-    manifest = {'run_id': run_id, 'identity': identity, 'taxonomy_codes': list(taxonomy.codes),
+    manifest = {'taxonomy_codes': list(taxonomy.codes),
                 'population_modes': dict(all_modes), 'eligible_groups': len(order),
                 'excluded': excluded, 'evaluation': [], 'development': [], 'case_hashes': {}}
-    labels = {}
+    labels, cases = {}, {}
     for index, c in enumerate(selected):
         cid = f'case-{index:04d}'
         entry = {k: c[k] for k in ('trace_id', 'framework', 'benchmark', 'modality', 'group')}
         entry.update(case_id=cid, source_hash=c['case']['source_hash'])
         partition = 'evaluation' if index < cfg['sample_size'] else 'development'
         manifest[partition].append(entry)
-        atomic_json(out / 'cases' / f'{cid}.json', c['case'])
-        manifest['case_hashes'][cid] = file_hash(out / 'cases' / f'{cid}.json')
+        cases[cid] = c['case']
+        manifest['case_hashes'][cid] = json_file_hash(c['case'])
         labels[cid] = c['ground_truth']
+    manifest['labels_hash'] = json_file_hash(labels)
+    # Bind membership, grouping/framework metadata, and all prepared artifacts to
+    # the same identity used by caches. A modified denominator cannot reuse a run.
+    identity['prepared_hash'] = digest(manifest)
+    run_id = digest(identity)
+    manifest.update(run_id=run_id, identity=identity)
+    out = run_root / run_id[:16]
+    if (out / 'manifest.json').exists():
+        from .runner import verify
+        if verify(out) != manifest: raise ValueError('Manifest differs from prepared cohort')
+        return out
+    for cid, case in cases.items(): atomic_json(out / 'cases' / f'{cid}.json', case)
     atomic_json(out / 'labels.json', labels)
-    manifest['labels_hash'] = file_hash(out / 'labels.json')
     (out / 'taxonomy.yaml').write_bytes((data_root / 'taxonomy.yaml').read_bytes())
     atomic_json(out / 'manifest.json', manifest)  # written last: marks preparation complete
     return out

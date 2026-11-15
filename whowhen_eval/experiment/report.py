@@ -10,6 +10,7 @@ from ..leaderboard import cell_metrics, AXES
 from .config import ARMS
 from .data import atomic_json
 from .runner import verify, result_name
+from .client import collapse_attempts
 
 
 def mode_counts(rows, labels=None):
@@ -82,6 +83,7 @@ def _usage(logs):
             'output_tokens_known': sum((c.get('usage') or {}).get('completion_tokens') or 0 for c in logs),
             'reasoning_tokens_known': sum(((c.get('usage') or {}).get('completion_tokens_details') or {}).get('reasoning_tokens') or 0 for c in logs),
             'call_seconds': sum(c.get('latency_seconds',0) for c in logs),
+            'unknown_outcome_attempts': sum(bool(c.get('unknown_outcome')) for c in logs),
             'transport_errors': sum(bool(c.get('error')) for c in logs)}
 
 
@@ -120,9 +122,11 @@ def summarize(run_dir, offline=False):
                 if record: wall.append(record.get('wall_seconds', 0))
                 audit = mode/'calls'/f'{name}.jsonl'
                 if audit.exists():
+                    events = []
                     for line in audit.read_text().splitlines():
-                        try: logs.append(json.loads(line))
+                        try: events.append(json.loads(line))
                         except json.JSONDecodeError: counts['incomplete_audit_lines'] += 1
+                    logs.extend(collapse_attempts(events))
         paired[arm] = rows; report['missing'] += counts['missing']
         avg, by_rep = repeated_metrics(rows)
         per_mode = mode_counts(rows)

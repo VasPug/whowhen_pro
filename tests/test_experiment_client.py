@@ -71,7 +71,8 @@ def test_nonretryable_error_is_sanitized(tmp_path, monkeypatch):
     c = client(tmp_path, monkeypatch, bad)
     with pytest.raises(ProviderError, match='401'): c('x',[{'type':'text','text':'hello'}])
     assert 'test-secret-key' not in (tmp_path/'calls.jsonl').read_text()
-    assert len((tmp_path/'calls.jsonl').read_text().splitlines()) == 1
+    from whowhen_eval.experiment.client import collapse_attempts
+    assert len(collapse_attempts([json.loads(l) for l in (tmp_path/'calls.jsonl').read_text().splitlines()])) == 1
 
 
 def test_response_model_mismatch_fails(tmp_path, monkeypatch):
@@ -87,3 +88,40 @@ def test_offline_never_needs_key(tmp_path, monkeypatch):
     assert 'OFFLINE' in result
     assert json.loads((tmp_path/'calls').read_text())['offline'] is True
     assert not (tmp_path/'budget').exists()
+
+
+def test_auth_preflight_uses_nonbillable_key_endpoint(monkeypatch):
+    from whowhen_eval.experiment.client import validate_credentials
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'secret')
+    seen = []
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self): return b'{"data":{"limit":null,"limit_remaining":null}}'
+    def open_url(request, timeout):
+        seen.append(request)
+        return Response()
+    monkeypatch.setattr('urllib.request.urlopen', open_url)
+    validate_credentials(load_config())
+    assert seen[0].full_url == 'https://openrouter.ai/api/v1/key'
+    assert seen[0].get_method() == 'GET'
+
+
+def test_interrupted_transport_has_persistent_started_attempt(tmp_path, monkeypatch):
+    def interrupt(*args): raise KeyboardInterrupt()
+    c = client(tmp_path, monkeypatch, interrupt)
+    with pytest.raises(KeyboardInterrupt): c('constraints', [{'type':'text', 'text':'trace'}])
+    lines = [json.loads(l) for l in (tmp_path/'calls.jsonl').read_text().splitlines()]
+    assert len(lines) == 1 and lines[0]['phase'] == 'started'
+    assert lines[0]['attempt_id'] and lines[0]['role'] == 'constraints'
+    assert json.loads((tmp_path/'budget.json').read_text())['attempts'] == 1
+
+
+def test_transient_payload_error_retries_like_http_status(tmp_path, monkeypatch):
+    calls = []
+    def transport(*args):
+        calls.append(1)
+        return {'error': {'code': 503, 'message': 'server overloaded'}} if len(calls)==1 else response(load_config())
+    c = client(tmp_path, monkeypatch, transport)
+    assert c('x', [{'type':'text', 'text':'trace'}]) == 'answer'
+    assert len(calls) == 2

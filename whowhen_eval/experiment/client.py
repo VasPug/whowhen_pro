@@ -7,6 +7,7 @@ import socket
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 from .data import atomic_json, digest
 
@@ -17,6 +18,41 @@ class ProviderError(RuntimeError):
 
 class BudgetExceeded(ProviderError):
     pass
+
+
+class FatalProviderError(ProviderError):
+    """Run-level setup/account error; do not cache a failed experiment outcome."""
+
+
+def validate_credentials(cfg):
+    key = os.environ.get('OPENROUTER_API_KEY', '').strip()
+    if not key: raise FatalProviderError('Set OPENROUTER_API_KEY before a live run')
+    request = urllib.request.Request('https://openrouter.ai/api/v1/key',
+                                     headers={'Authorization': f'Bearer {key}'})
+    try:
+        with urllib.request.urlopen(request, timeout=cfg['timeout']) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as e:
+        raise FatalProviderError(f'OpenRouter key preflight failed (HTTP {e.code}); no experiment outcomes cached') from None
+    except Exception:
+        raise FatalProviderError('OpenRouter key preflight unavailable; no experiment outcomes cached') from None
+    data = result.get('data')
+    if not isinstance(data, dict): raise FatalProviderError('Unexpected OpenRouter key preflight response')
+    if data.get('limit') is not None and data.get('limit_remaining') is not None and data['limit_remaining'] <= 0:
+        raise FatalProviderError('OpenRouter key spending limit exhausted; no experiment outcomes cached')
+
+
+def collapse_attempts(events):
+    """One report row per attempt, including starts lacking a completion record."""
+    attempts = {}
+    for index, row in enumerate(events):
+        attempts[row.get('attempt_id', f'legacy-{index}')] = row
+    out = []
+    for row in attempts.values():
+        if row.get('phase') == 'started':
+            row = {**row, 'unknown_outcome': True, 'error': 'Interrupted attempt; usage/outcome unknown'}
+        out.append(row)
+    return out
 
 
 def openrouter_transport(payload, key, timeout):
@@ -86,24 +122,33 @@ class Client:
                                               'completion': self.cfg['output_price_per_million']}}}
         if self.offline:
             result = _offline(role, parts)
-            self._record({'role': role, 'offline': True, 'request': payload, 'response': result,
+            self._record({'role': role, 'offline': True, 'phase': 'completed', 'attempt_id': uuid.uuid4().hex,
+                          'request': payload, 'response': result,
                           'usage': None, 'latency_seconds': 0, 'attempt': 1, 'error': None})
             return result
         for attempt in range(1, self.cfg['retries'] + 2):
             reserved = self._reserve(payload)
             start = time.monotonic()
             row = {'role': role, 'offline': False, 'request_hash': digest(payload), 'request': payload,
-                   'attempt': attempt, 'reserved_usd': reserved, 'usage': None, 'error': None}
-            retry = False
+                   'attempt': attempt, 'reserved_usd': reserved, 'usage': None, 'error': None,
+                   'attempt_id': uuid.uuid4().hex, 'phase': 'started'}
+            self._record(row)  # durable before the possibly billable request
+            row['phase'] = 'completed'
+            retry, fatal = False, False
             try:
                 response = self.transport(payload, self.key, self.cfg['timeout'])
                 row.update(returned_model=response.get('model'), returned_provider=response.get('provider'),
                            usage=response.get('usage'))
-                if response.get('error'): raise ProviderError('Provider returned an error payload')
-                if response.get('model') != self.cfg['model']: raise ProviderError('Returned model differs from frozen model')
+                if response.get('error'):
+                    error = response['error']
+                    code = error.get('code') if isinstance(error, dict) else None
+                    if isinstance(code, int) or (isinstance(code, str) and code.isdigit()):
+                        raise urllib.error.HTTPError('https://openrouter.ai', int(code), 'Provider error payload', {}, None)
+                    raise ProviderError('Provider returned an unclassified error payload')
+                if response.get('model') != self.cfg['model']: raise FatalProviderError('Returned model differs from frozen model')
                 provider = response.get('provider')
                 if provider and provider.lower() != self.cfg['provider'].split('/')[0].lower():
-                    raise ProviderError('Returned provider differs from pinned provider')
+                    raise FatalProviderError('Returned provider differs from pinned provider')
                 choices = response.get('choices') or []
                 if not choices: raise ProviderError('Provider returned no completion')
                 choice = choices[0]
@@ -116,8 +161,11 @@ class Client:
             except urllib.error.HTTPError as e:
                 row['error'] = f'Provider HTTP {e.code}'
                 retry = e.code in (408, 429, 500, 502, 503, 504)
+                fatal = e.code in (400, 401, 402, 403, 404, 422)
             except (urllib.error.URLError, TimeoutError, socket.timeout):
                 row['error'] = 'Provider network timeout/error'; retry = True
+            except FatalProviderError as e:
+                row['error'] = str(e); fatal = True
             except ProviderError as e:
                 row['error'] = str(e)
             except Exception as e:
@@ -125,6 +173,7 @@ class Client:
             row['latency_seconds'] = time.monotonic() - start
             self._record(row)
             if row['error'] is None: return result
+            if fatal: raise FatalProviderError(row['error'])
             if not retry or attempt > self.cfg['retries']: raise ProviderError(row['error'])
             self.sleep(min(2 ** (attempt - 1), 8))
         raise AssertionError('unreachable')
