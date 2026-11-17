@@ -69,7 +69,7 @@ def _offline(role, parts):
     if role == 'semantic':
         return json.dumps({'result': 'inconclusive', 'reason': 'OFFLINE synthetic check', 'evidence': []})
     if role.startswith('review_'):
-        return json.dumps({'verdict': 'challenge', 'reason': 'OFFLINE synthetic review', 'evidence': []})
+        return json.dumps({'verdict': 'inconclusive', 'reason': 'OFFLINE synthetic review', 'evidence': []})
     text = '\n'.join(p.get('text', '') for p in parts)
     match = re.search(r'^Step\s+(\S+)\s*\|\s*Agent:\s*(\S+)', text, re.M)
     coord, agent = match.groups() if match else ('1', 'agent')
@@ -90,7 +90,7 @@ class Client:
 
     def _reserve(self, payload):
         # UTF-8 bytes upper-bound ordinary text tokens, with ample framing allowance.
-        input_bound = len(json.dumps(payload['messages'], ensure_ascii=False).encode()) + 1024
+        input_bound = len(json.dumps(payload, ensure_ascii=False).encode()) + 1024
         amount = (input_bound * self.cfg['input_price_per_million']
                   + self.cfg['max_tokens'] * self.cfg['output_price_per_million']) / 1_000_000
         state = json.loads(self.budget_path.read_text()) if self.budget_path.exists() else {
@@ -108,7 +108,7 @@ class Client:
         with self.audit_path.open('a') as f:
             f.write(text + '\n'); f.flush(); os.fsync(f.fileno())
 
-    def __call__(self, role, parts):
+    def __call__(self, role, parts, *, response_format=None):
         if not all(p.get('type') == 'text' and isinstance(p.get('text'), str) for p in parts):
             raise ProviderError('Text pilot requires text content only')
         if sum(len(p['text']) for p in parts) > self.cfg['max_input_chars']:
@@ -120,6 +120,8 @@ class Client:
                                 'require_parameters': True,
                                 'max_price': {'prompt': self.cfg['input_price_per_million'],
                                               'completion': self.cfg['output_price_per_million']}}}
+        if response_format is not None:
+            payload['response_format'] = response_format
         if self.offline:
             result = _offline(role, parts)
             self._record({'role': role, 'offline': True, 'phase': 'completed', 'attempt_id': uuid.uuid4().hex,

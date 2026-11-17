@@ -125,3 +125,15 @@ def test_transient_payload_error_retries_like_http_status(tmp_path, monkeypatch)
     c = client(tmp_path, monkeypatch, transport)
     assert c('x', [{'type':'text', 'text':'trace'}]) == 'answer'
     assert len(calls) == 2
+
+
+def test_structured_output_is_sent_and_audited(tmp_path, monkeypatch):
+    sent=[]
+    def transport(payload,*args):
+        sent.append(payload); return response(load_config())
+    c=client(tmp_path,monkeypatch,transport)
+    schema={'type':'json_schema','json_schema':{'name':'review','strict':True,'schema':{'type':'object','properties':{},'additionalProperties':False}}}
+    c('review_fault',[{'type':'text','text':'Review'}],response_format=schema)
+    assert sent[0]['response_format']==schema
+    logs=[json.loads(l) for l in (tmp_path/'calls.jsonl').read_text().splitlines()]
+    assert logs[-1]['request']['response_format']==schema

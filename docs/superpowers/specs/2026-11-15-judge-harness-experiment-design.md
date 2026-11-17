@@ -182,3 +182,18 @@ No execution, dependency installation, environment intervention, or author outre
 - [AgentRx paper, version 2](https://arxiv.org/abs/2602.02475v2) and [official implementation](https://github.com/microsoft/AgentRx).
 - [RAFFLES, EACL 2026](https://aclanthology.org/2026.eacl-long.359/).
 - [Princeton: Emerging Trends in AI Agent Evaluation](https://sage.cs.princeton.edu/trends/emerging-trends-paper.pdf), for separating model/scaffold effects, documenting budgets, and reporting uncertainty.
+
+
+## Amendment — 2026-11-16: tolerate intermediate formatting failures
+
+User requested following upstream deterministic, lenient parsing after the live
+pilot exposed JSON/citation failures. This supersedes fail-whole-trial handling
+of intermediate validation errors: preserve valid neighboring requirements/checks,
+log `audit.parse_warnings`, and downgrade unusable checks/reviews to inconclusive.
+Continue to the final diagnosis. Exact grounding requirements remain in force for
+accepted evidence. Final field parsing/scoring stays upstream-compatible, including
+partial RAFFLES output when no fully valid candidate exists. Single JSON objects
+inside prose/fences are accepted; ambiguous/broken JSON is not reconstructed.
+Provider and budget failures still propagate. No additional repair calls are added.
+See the quickstart's parsing section for the precise fallback policy. Old pilot
+artifacts remain unchanged; this is a different implementation/run identity.

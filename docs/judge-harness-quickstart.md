@@ -59,7 +59,7 @@ Run the same command to resume. Completed records, including recorded failures, 
 
 Invalid credentials, insufficient account credit, and global routing/configuration errors stop the run without caching the affected case as a failure. Correct the key/account issue and rerun the same command. Already completed cases remain intact; unscheduled cases remain visibly missing until resumed.
 
-Exit code 0 means every scheduled result completed without harness/transport failures; 3 means recorded failures remain; 2 means the report is incomplete; 1 indicates setup/configuration trouble. A parseable but partly missing attribution is recorded with parser warnings and scored per available field, just as upstream does. Missing final outputs or failed stages count wrong on all axes. Review disagreement at the cap can still produce a valid final result.
+Exit code 0 means every scheduled result completed without harness/transport failures; 3 means recorded failures remain; 2 means the report is incomplete; 1 indicates setup/configuration trouble. A parseable but partly missing attribution is recorded with parser warnings and scored per available field, just as upstream does. Missing final fields count wrong on their respective axes; transport/budget failures still fail the trial. Review disagreement at the cap can still produce a valid final result.
 
 ## Change the experiment
 
@@ -85,3 +85,51 @@ For a larger run, increase cohort/repetitions and review the cost and length lim
 The original full-dataset tests skip when `WHOWHEN_DATA` is unset. Setting it for the full suite requires the missing image/video splits as well; the framework-specific command above works with this text-only download. Development verification also checked representative traces from all eight text frameworks and the alternate-label scoring case.
 
 Design: [experiment specification](superpowers/specs/2026-11-15-judge-harness-experiment-design.md). Implementation: [plan](superpowers/plans/2026-11-15-judge-harness.md).
+
+## Deterministic parsing and degraded evidence (2026-11-16)
+
+All final diagnoses use the unchanged upstream four-field parser. Intermediate
+JSON accepts a single complete object surrounded by prose or code fences. Broken
+JSON is not guessed or repaired with another model call.
+
+Unusable requirement entries are dropped individually with audit warnings; unreadable
+requirement/constraint lists contribute no checks and are explicitly warned about.
+Lists over the configured limit are truncated deterministically. A malformed
+constraint, semantic check, or reviewer response becomes inconclusive, with no
+accepted evidence. Other usable entries and the final diagnosis continue.
+Exact source citations and numeric grounding remain required to accept evidence;
+a rejected quote no longer rejects the entire trial. Inconclusive reviewers cannot
+trigger consensus. RAFFLES retains its latest structurally valid diagnosis, or
+returns the final partial diagnosis through the upstream parser if none was valid.
+
+Warnings are stored in `audit.parse_warnings`, and original responses remain in
+call logs. A completed trial means the workflow returned a diagnosis, not that all
+checks succeeded or the diagnosis was correct. Inspect warnings/inconclusive checks
+alongside scores. No extra model calls or formatting retries were added.
+
+This extends the upstream parser's tolerant failure policy to our custom intermediate
+formats; it is not a claim that Who&When Pro implements these evidence stages.
+The code hash changes, so prepare a new run; previous results are retained unchanged.
+Prior pilot outcomes must not be relabeled as results of this corrected harness.
+
+## Source-ID integration (2026-11-17)
+
+This supersedes the earlier exact-quotation requirement for semantic evidence.
+AgentRx and RAFFLES share a deterministic source resolver: accept an ID string or
+an object containing `ref`, retrieve the original recorded text, and discard any
+model-supplied quote/extra fields. Unknown or future references remain invalid;
+conclusive checks/reviews require nonempty evidence. Valid IDs establish source
+location, not semantic truth. Numeric operands retain exact span/value checks.
+
+Reviewer prompts now have one review contract without the baseline diagnosis
+instructions. Both harnesses request JSON output, with schemas where applicable;
+parsers still handle equivalent ID representations because the provider did not
+consistently enforce the requested schema. Requirements prioritize the main task
+before formatting. Revision histories use compact IDs plus source coordinates;
+full retrieved text remains in audits. The final four-field parser, baseline prompt,
+model settings, sample selection and scoring formulas are unchanged.
+
+The six original development cases are tested separately with
+`scripts/validate-source-id-development.py`. A new evaluation identity is generated
+for the integrated implementation. Prior inspected 24-case pilot results are retained;
+a repeat on those cases is debugging/evaluation evidence, not a new held-out study.

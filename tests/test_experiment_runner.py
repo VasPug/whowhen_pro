@@ -55,7 +55,7 @@ def test_partial_report_keeps_denominator(prepared):
 def test_failures_remain_wrong_and_recorded(prepared):
     class Broken:
         def __init__(self, *args, **kwargs): pass
-        def __call__(self, *args): raise ValueError('synthetic failure')
+        def __call__(self, *args, **kwargs): raise ValueError('synthetic failure')
     run(prepared, offline=True, client_factory=Broken)
     r = summarize(prepared, offline=True)
     assert r['complete'] and r['missing'] == 0
@@ -96,7 +96,7 @@ def test_fatal_provider_error_leaves_cases_resumable(prepared, monkeypatch):
     monkeypatch.setattr('whowhen_eval.experiment.runner.validate_credentials', lambda cfg: None)
     class BadKey:
         def __init__(self, *args, **kwargs): pass
-        def __call__(self, *args): raise FatalProviderError('Provider HTTP 401')
+        def __call__(self, *args, **kwargs): raise FatalProviderError('Provider HTTP 401')
     with pytest.raises(FatalProviderError): run(prepared, client_factory=BadKey)
     assert not list((prepared/'live'/'results').glob('*.json'))
 
